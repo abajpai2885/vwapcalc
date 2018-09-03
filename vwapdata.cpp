@@ -81,7 +81,7 @@ std::unordered_map<std::string, std::shared_ptr<Quote*>> QuotePtrMap;
 std::unordered_map<std::string, std::shared_ptr<Trade*>> TradePtrMap;
 
 
-void updateQuote(Quote* ptr)  //ptr to a quote struct
+void updateQuote(std::unique_ptr<Quote> & ptr)  //ptr to a quote struct
 {
     //search the hash map for the symbol and update the quote, if not found add this one
     auto pos = QuotePtrMap.find(ptr->symbol);
@@ -96,7 +96,7 @@ void updateQuote(Quote* ptr)  //ptr to a quote struct
     }
 }
 
-void updatecounters(Trade* ptr)
+void updatecounters(std::unique_ptr<Trade> & ptr)
 {
 
     //update avg price
@@ -129,7 +129,8 @@ void updatecounters(Trade* ptr)
     totalqty[ptr->symbol][ptr->side] += ptr->qty;
 }
 
-int vwap(std::string symbol, std::string side)
+//getvwap
+int getvwap(std::string symbol, std::string side)
 {
     auto pos = vwapmap.find(symbol);
     if (pos != vwapmap.end())
@@ -156,3 +157,30 @@ void sendOrder()
   //if current quote price is equal to or better than vwap, send an order
   
 }
+
+int main()
+{
+  for (int i =0; i < 100; i ++)
+  {
+     std::unique_ptr<Quote> qptr = std::make_unique<Quote>();
+     qptr->timestamp = i;
+     qptr->symbol = "BTC.USD";
+     qptr->bid_price = i+10;
+     qptr->bid_qty = i*100;
+     qptr->ask_price = i + 11;
+     qptr->ask_qty = i * 100;
+     updateQuote(qptr);
+  }
+  
+  for (int i =0; i < 10; i ++)
+  {
+     std::unique_ptr<Trade> tptr = std::make_unique<Trade>();
+     tptr->timestamp = 10;
+     tptr->symbol = "BTC.USD";
+     tptr->price = 2*i+10;
+     tptr->qty = i*100;
+     updatecounters(qptr);
+  }
+
+  return 0;
+};
