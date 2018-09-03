@@ -1,9 +1,7 @@
-#pragma once
-
-#include <stdio>
-#include <stdint>
-#include <stdlib>
 #include <iostream>
+#include <cstdlib>
+#include <memory>
+#include <unordered_map>
 
 
 struct Header
@@ -12,14 +10,16 @@ struct Header
   uint8_t message_type;
 };
 
+//normalized quote struct
+//assumption : innbound message quote message will be converted to this
 struct Quote
 {
-   uint8_t timestamp[8];
-   char symbol[8];
-   int8_t bid_price[4];
-   uint8_t bid_qty[4];
-   int8_t ask_price[4];
-   uint8_t ask_qty[4];
+   long timestamp;
+   std::string symbol;
+   double bid_price;
+   double bid_qty;
+   double ask_price;
+   double ask_qty;
    
    public:
    Quote() = default;
@@ -31,7 +31,7 @@ struct Quote
       bid_price = other.bid_price;
       bid_qty = other.bid_qty;
       ask_price = other.ask_price;
-      ask_qty = other.ask.qty;
+      ask_qty = other.ask_qty;
    }
    
    Quote& operator=(Quote&& other)
@@ -43,7 +43,7 @@ struct Quote
         bid_price = other.bid_price;
         bid_qty = other.bid_qty;
         ask_price = other.ask_price;
-        ask_qty = other.ask.qty;
+        ask_qty = other.ask_qty;
       }
       return *this;
    }
@@ -51,21 +51,24 @@ struct Quote
 
 typedef std::shared_ptr<Quote*> QuotePtr;
 
+//normalized Trade struct
+//assumption: inbound Trade message will be nrmalized into this struct
 struct Trade
 {
-  uint8_t timestamp[8];
-  char symbol[8];
-  int8_t price[4];
-  unit8_t qty[4];
+  long timestamp;
+  std::string symbol;
+  double price;
+  double qty;
 };
 
+//normalized Order message
 struct Order
 {
-  uint8_t timestamp[8];
-  char symbol[8];
-  char side;
-  int8_t price[4];
-  uint8_t qty[4];
+  long timestamp;
+  std::string symbol;
+  std::string side;
+  double price;
+  double qty;
 };
 
 typedef std::unordered_map<std::string, int> SIDEDATAMAP;
@@ -74,7 +77,7 @@ std::unordered_map<std::string, SIDEDATAMAP> vwapmap;
 
 std::unordered_map<std::string, SIDEDATAMAP> avgprice;
 
-std::unordered_map<std::srting, SIDEDATAMAP> totalqty;
+std::unordered_map<std::string, SIDEDATAMAP> totalqty;
 
 std::unordered_map<std::string, std::shared_ptr<Quote*>> QuotePtrMap;
 
@@ -87,11 +90,11 @@ void updateQuote(std::unique_ptr<Quote> & ptr)  //ptr to a quote struct
     auto pos = QuotePtrMap.find(ptr->symbol);
     if (pos != QuotePtrMap.end())
     {
-        pos->second(std::move(ptr));
+        pos->second(std::move(std::make_shared(ptr)));
     }
     else
     {
-      std::make_shared<Quote*>(ptr);
+      std::make_shared<Quote>(ptr);
       QuotePtrMap.emplace(std::make_pair(ptr->symbol, ptr));
     }
 }
@@ -184,3 +187,4 @@ int main()
 
   return 0;
 };
+
