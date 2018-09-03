@@ -49,7 +49,7 @@ struct Quote
    }
 };
 
-typedef std::shared_ptr<Quote*>
+typedef std::shared_ptr<Quote*> QuotePtr;
 
 struct Trade
 {
@@ -68,11 +68,13 @@ struct Order
   uint8_t qty[4];
 };
 
-std::unordered_map<std::string, int> vwapmap;
+typedef std::unordered_map<std::string, int> SIDEDATAMAP;
 
-std::unordered_map<std::string, int> avgprice;
+std::unordered_map<std::string, SIDEDATAMAP> vwapmap;
 
-std::unordered_map<std::srting, int> totalqty;
+std::unordered_map<std::string, SIDEDATAMAP> avgprice;
+
+std::unordered_map<std::srting, SIDEDATAMAP> totalqty;
 
 std::unordered_map<std::string, std::shared_ptr<Quote*>> QuotePtrMap;
 
@@ -89,7 +91,7 @@ void updateQuote(Quote* ptr)  //ptr to a quote struct
     }
     else
     {
-      std::make_shared<Quoet*>(ptr);
+      std::make_shared<Quote*>(ptr);
       QuotePtrMap.emplace(std::make_pair(ptr->symbol, ptr));
     }
 }
@@ -101,40 +103,56 @@ void updatecounters(Trade* ptr)
     auto pos = avgprice.find(ptr->symbol);
     if (pos != avgprice.end())
     {
-      auto oldprice = pos->second;
-      auto currprice = ptr->price;
-      auto newprice = (oldprice + newprice) / 2;
-      avgprice[ptr->symbol] = newprice;
+      auto priceiter = pos->second.find(ptr->side);
+      if(priceiter != pos->second.end())
+      {
+        auto oldprice = priceiter->second;
+        auto currprice = ptr->price;
+        auto newprice = (oldprice + newprice) / 2;
+        avgprice[ptr->symbol][ptr->side] = newprice;
+      }
+      else
+      {
+        SIDEDATAMAP data;
+        data.emplace(std::make_pair(ptr->side, ptr->price));
+        avgprice.emplace(std::make_pair(ptr->symbol, data));
+      }
     }
     else
     {
-        avgprice.emplace(std::make_pair(ptr->symbol, ptr->price));
+        SIDEDATAMAP data;
+        data.emplace(std::make_pair(ptr->side, ptr->price));
+        avgprice.emplace(std::make_pair(ptr->symbol, data));
     }
     
     //update total qty
-    pos = totalqty.find(ptr->symbol);
-    if(pos != totalqty.end())
-    {
-      totalqty[ptr->symbol] += ptr->qty;
-    }
-    else
-    {
-      totalqty.emplace(std::make_pair(ptr->symbol, ptr->qty));
-    }
+    totalqty[ptr->symbol][ptr->side] += ptr->qty;
 }
 
-int vwap(std::string symbol)
+int vwap(std::string symbol, std::string side)
 {
     auto pos = vwapmap.find(symbol);
     if (pos != vwapmap.end())
     {
-        vwapmap[symbol] = (avgprice[symbol] * totalqty[symbol])/totalqty[symbol];
+        auto inneriter = pos->second.find(side);
+        if(inneriter != pos->second.end())
+        {
+          vwapmap[symbol][side] = (avgprice[symbol][side] * totalqty[symbol][side])/totalqty[symbol][side];
+        }
     }
     else
     {
-        auto vwap = (avgprice[symbol] * totalqty[symbol])/totalqty[symbol];
-        vwapmap.emplace(std::make_pair(symbol, vwap));
+        auto vwap = (avgprice[symbol][side] * totalqty[symbol][side])/totalqty[symbol][side];
+        SIDEDATAMAP data;
+        data.emplace(std::make_pair(side, vwap));
+        vwapmap.emplace(std::make_pair(symbol, data));
     }
     
-    return vwapmap[symbol];
+    return vwapmap[symbol][side];
+}
+
+void sendOrder()
+{
+  //if current quote price is equal to or better than vwap, send an order
+  
 }
