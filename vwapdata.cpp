@@ -85,6 +85,19 @@ std::unordered_map<std::string, std::shared_ptr<Quote>> QuotePtrMap;
 std::unordered_map<std::string, std::shared_ptr<Trade>> TradePtrMap;
 
 
+void sendbuyOrder(std::string symbol)
+{
+  //if current quote price is equal to or better than vwap, send an order
+  std::cout << "Sent a buy order for : " << symbol << std::endl;
+  
+}
+
+void sendsellOrder(std::string symbol)
+{
+  //if current quote price is equal to or better than vwap, send an order
+  std::cout << "sent a sell order for : " << symbol << std::endl;
+}
+
 void updateQuote(std::unique_ptr<Quote> & ptr)  //ptr to a quote struct
 {
     //search the hash map for the symbol and update the quote, if not found add this one
@@ -98,6 +111,11 @@ void updateQuote(std::unique_ptr<Quote> & ptr)  //ptr to a quote struct
       //std::make_shared<Quote>(ptr.get());
       QuotePtrMap.emplace(std::make_pair(ptr->symbol, std::make_shared<Quote>(*(ptr))));
     }
+    //if bid price is greater than vwap, sell and if ask price is less than vwap , buy
+    if(ptr->bid_price >= vwapmap[ptr->symbol])
+        sendsellOrder(ptr->symbol);
+    else if(ptr->ask_price <= vwapmap[ptr->symbol])
+        sendbuyOrder(ptr->symbol);
 }
 
 void updatecounters(std::unique_ptr<Trade> & ptr)
@@ -116,6 +134,12 @@ void updatecounters(std::unique_ptr<Trade> & ptr)
     
     //update total qty
     totalqty[ptr->symbol] += ptr->qty;
+    //if bid price is greater than vwap, sell and if ask price is less than vwap , buy
+    if(ptr->price >= vwapmap[ptr->symbol])
+        sendsellOrder(ptr->symbol);
+    else if(ptr->price <= vwapmap[ptr->symbol])
+        sendbuyOrder(ptr->symbol);
+
      
 }
 
@@ -133,11 +157,9 @@ double calcvwap(std::string symbol)
     return vwapmap[symbol];
 }
 
-void sendOrder()
-{
-  //if current quote price is equal to or better than vwap, send an order
-  
-}
+
+
+
 
 int main()
 {
@@ -167,3 +189,4 @@ int main()
 
   return 0;
 };
+
