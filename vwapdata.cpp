@@ -11,7 +11,7 @@ struct Header
 };
 
 //normalized quote struct
-//assumption : innbound message quote message will be converted to this
+//assumption : innbound message quote message will be normalized to this format
 struct Quote
 {
    long timestamp;
@@ -24,6 +24,8 @@ struct Quote
    public:
    Quote() = default;
    ~Quote() = default;
+   Quote(Quote& other) = default;
+   Quote& operator=(Quote& other) = default;
    Quote(Quote&& other)
    {
       timestamp = other.timestamp;
@@ -49,10 +51,10 @@ struct Quote
    }
 };
 
-typedef std::shared_ptr<Quote*> QuotePtr;
-
 //normalized Trade struct
 //assumption: inbound Trade message will be nrmalized into this struct
+//assumption: trade message also has a "side" property in it because quantiy is unsigned, so there is 
+//no other way of knowing the type of trade executed
 struct Trade
 {
   long timestamp;
@@ -71,17 +73,16 @@ struct Order
   double qty;
 };
 
-typedef std::unordered_map<std::string, int> SIDEDATAMAP;
 
-std::unordered_map<std::string, SIDEDATAMAP> vwapmap;
+std::unordered_map<std::string, double> vwapmap;
 
-std::unordered_map<std::string, SIDEDATAMAP> avgprice;
+std::unordered_map<std::string, double> avgprice;
 
-std::unordered_map<std::string, SIDEDATAMAP> totalqty;
+std::unordered_map<std::string, long> totalqty;
 
-std::unordered_map<std::string, std::shared_ptr<Quote*>> QuotePtrMap;
+std::unordered_map<std::string, std::shared_ptr<Quote>> QuotePtrMap;
 
-std::unordered_map<std::string, std::shared_ptr<Trade*>> TradePtrMap;
+std::unordered_map<std::string, std::shared_ptr<Trade>> TradePtrMap;
 
 
 void updateQuote(std::unique_ptr<Quote> & ptr)  //ptr to a quote struct
@@ -90,12 +91,12 @@ void updateQuote(std::unique_ptr<Quote> & ptr)  //ptr to a quote struct
     auto pos = QuotePtrMap.find(ptr->symbol);
     if (pos != QuotePtrMap.end())
     {
-        pos->second(std::move(std::make_shared(ptr)));
+       pos->second = std::make_shared<Quote>(*ptr);
     }
     else
     {
-      std::make_shared<Quote>(ptr);
-      QuotePtrMap.emplace(std::make_pair(ptr->symbol, ptr));
+      //std::make_shared<Quote>(ptr.get());
+      QuotePtrMap.emplace(std::make_pair(ptr->symbol, std::make_shared<Quote>(*(ptr))));
     }
 }
 
@@ -106,53 +107,30 @@ void updatecounters(std::unique_ptr<Trade> & ptr)
     auto pos = avgprice.find(ptr->symbol);
     if (pos != avgprice.end())
     {
-      auto priceiter = pos->second.find(ptr->side);
-      if(priceiter != pos->second.end())
-      {
-        auto oldprice = priceiter->second;
+        auto oldprice = pos->second;
         auto currprice = ptr->price;
-        auto newprice = (oldprice + newprice) / 2;
-        avgprice[ptr->symbol][ptr->side] = newprice;
-      }
-      else
-      {
-        SIDEDATAMAP data;
-        data.emplace(std::make_pair(ptr->side, ptr->price));
-        avgprice.emplace(std::make_pair(ptr->symbol, data));
-      }
+        avgprice[ptr->symbol] = (oldprice + currprice) / 2;
     }
     else
-    {
-        SIDEDATAMAP data;
-        data.emplace(std::make_pair(ptr->side, ptr->price));
-        avgprice.emplace(std::make_pair(ptr->symbol, data));
-    }
+        avgprice.emplace(std::make_pair(ptr->symbol, ptr->price));
     
     //update total qty
-    totalqty[ptr->symbol][ptr->side] += ptr->qty;
+    totalqty[ptr->symbol] += ptr->qty;
+     
 }
 
 //getvwap
-int getvwap(std::string symbol, std::string side)
+double calcvwap(std::string symbol)
 {
     auto pos = vwapmap.find(symbol);
     if (pos != vwapmap.end())
     {
-        auto inneriter = pos->second.find(side);
-        if(inneriter != pos->second.end())
-        {
-          vwapmap[symbol][side] = (avgprice[symbol][side] * totalqty[symbol][side])/totalqty[symbol][side];
-        }
+          vwapmap[symbol] = (avgprice[symbol] * totalqty[symbol])/totalqty[symbol];
     }
     else
-    {
-        auto vwap = (avgprice[symbol][side] * totalqty[symbol][side])/totalqty[symbol][side];
-        SIDEDATAMAP data;
-        data.emplace(std::make_pair(side, vwap));
-        vwapmap.emplace(std::make_pair(symbol, data));
-    }
+        vwapmap.emplace(std::make_pair(symbol, (avgprice[symbol] * totalqty[symbol])/totalqty[symbol]));
     
-    return vwapmap[symbol][side];
+    return vwapmap[symbol];
 }
 
 void sendOrder()
@@ -182,9 +160,10 @@ int main()
      tptr->symbol = "BTC.USD";
      tptr->price = 2*i+10;
      tptr->qty = i*100;
-     updatecounters(qptr);
+     updatecounters(tptr);
+     double vwap = calcvwap("BTC.USD");
+     std::cout << "VWAP is : " << vwap << std::endl;
   }
 
   return 0;
 };
-
